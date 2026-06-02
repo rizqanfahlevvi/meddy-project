@@ -11,8 +11,10 @@ python-dotenv==1.0.0
 # LLM (Pure Python - No compilation)
 google-generativeai
 
-# Database (SQLite - Built-in, no compilation)
+# Database
 sqlalchemy==2.0.23
+# psycopg2-binary==2.9.9
+alembic==1.13.0
 
 # Utilities
 requests==2.31.0
