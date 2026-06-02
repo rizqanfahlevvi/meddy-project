@@ -35,8 +35,8 @@ async def root():
     """Root endpoint - Server status"""
     return {
         "message": "MEDDY API is running ✓",
-        "version": os.getenv("APP_VERSION"),
-        "environment": os.getenv("ENVIRONMENT")
+        "version": "0.1.0",
+        "environment": os.getenv("ENVIRONMENT", "development")
     }
 
 @app.get("/health")
@@ -45,48 +45,11 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "MEDDY",
-        "version": os.getenv("APP_VERSION"),
-        "timestamp": str(os.uname().nodename) if hasattr(os, 'uname') else 'windows'
+        "version": "0.1.0"
     }
 
 # ============================================
-# GEMINI API TEST
-# ============================================
-
-# @app.get("/test/gemini")
-# async def test_gemini():
-#     """Test Google Gemini API connection"""
-#     try:
-#         import google.generativeai as genai
-        
-#         api_key = os.getenv("GOOGLE_API_KEY")
-#         if not api_key:
-#             return {
-#                 "status": "error",
-#                 "message": "GOOGLE_API_KEY not set in .env"
-#             }
-        
-#         genai.configure(api_key=api_key)
-#         model = genai.GenerativeModel('gemini-2.0-flash')
-        
-#         response = model.generate_content(
-#             "Respond briefly: Are you ready to help doctors?"
-#         )
-        
-#         return {
-#             "status": "success",
-#             "gemini_response": response.text,
-#             "model": "gemini-pro"
-#         }
-#     except Exception as e:
-#         logger.error(f"Gemini test failed: {e}")
-#         return {
-#             "status": "error",
-#             "message": str(e)
-#         }
-
-# ============================================
-# TELEGRAM BOT TEST
+# TELEGRAM BOT TEST ENDPOINT (Optional)
 # ============================================
 
 @app.get("/test/telegram")
