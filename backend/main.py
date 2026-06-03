@@ -101,14 +101,23 @@ app = FastAPI(
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     """Terima update dari Telegram via webhook"""
-    bot = app.state.telegram_bot
-    if bot is None:
-        return {"ok": False, "message": "Bot not initialized"}
+    try:
+        bot = app.state.telegram_bot
+        if bot is None:
+            print("[MEDDY] Webhook hit tapi bot is None!", flush=True)
+            return {"ok": False}
 
-    data = await request.json()
-    update = Update.de_json(data, bot.app.bot)
-    await bot.app.process_update(update)
-    return {"ok": True}
+        data = await request.json()
+        print(f"[MEDDY] Webhook received: {list(data.keys())}", flush=True)
+
+        update = Update.de_json(data, bot.app.bot)
+        await bot.app.process_update(update)
+        print("[MEDDY] Update processed OK", flush=True)
+        return {"ok": True}
+    except Exception as e:
+        print(f"[MEDDY] Webhook error: {e}", flush=True)
+        logger.error(f"Webhook error: {e}", exc_info=True)
+        return {"ok": False}
 
 # ============================================
 # HEALTH CHECK ENDPOINTS
