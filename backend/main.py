@@ -139,6 +139,22 @@ async def health_check():
         "version": APP_VERSION
     }
 
+@app.get("/test/webhook")
+async def test_webhook():
+    """Cek status webhook dari Telegram"""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        return {"error": "TELEGRAM_BOT_TOKEN not set"}
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"https://api.telegram.org/bot{bot_token}/getWebhookInfo",
+                timeout=10.0
+            )
+        return r.json()
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/test/telegram")
 async def test_telegram():
     """Test Telegram bot token"""
