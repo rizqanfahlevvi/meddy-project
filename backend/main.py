@@ -4,9 +4,13 @@ FastAPI backend for Clinical Decision Support
 """
 
 import os
+import sys
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+
+# Pastikan folder backend/ selalu bisa ditemukan saat import
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import httpx
 from fastapi import FastAPI, Request
