@@ -114,7 +114,7 @@ Saya akan bantu dengan evidence-based recommendations.
             )
             from google.genai import types
             response = await self.gemini_client.aio.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-1.5-flash-latest",
                 contents=user_message,
                 config=types.GenerateContentConfig(
                     system_instruction=MEDDY_SYSTEM_PROMPT
