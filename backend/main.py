@@ -23,8 +23,12 @@ from telegram_bot import get_telegram_bot
 # Load environment variables dari .env
 load_dotenv()
 
-# Setup logging
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+# Setup logging — force=True agar override konfigurasi uvicorn
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(levelname)s: [MEDDY] %(message)s",
+    force=True
+)
 logger = logging.getLogger(__name__)
 
 APP_VERSION = "0.1.0"
@@ -35,12 +39,15 @@ APP_VERSION = "0.1.0"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("[MEDDY] Server starting up...", flush=True)
+
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     gemini_api_key = os.getenv("GEMINI_API_KEY")
     bot = None
     polling_task = None
 
     if bot_token:
+        print(f"[MEDDY] TELEGRAM_BOT_TOKEN ditemukan, memulai bot...", flush=True)
         try:
             bot = get_telegram_bot(bot_token, gemini_api_key)
             await bot.initialize()
@@ -49,12 +56,13 @@ async def lifespan(app: FastAPI):
                 bot.app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
             )
             app.state.telegram_bot = bot
-            logger.info("Telegram bot started")
+            print("[MEDDY] ✓ Telegram bot started", flush=True)
         except Exception as e:
+            print(f"[MEDDY] ✗ Failed to start Telegram bot: {e}", flush=True)
             logger.error(f"Failed to start Telegram bot: {e}")
             app.state.telegram_bot = None
     else:
-        logger.warning("TELEGRAM_BOT_TOKEN not set — Telegram bot disabled")
+        print("[MEDDY] ✗ TELEGRAM_BOT_TOKEN tidak ditemukan — bot disabled", flush=True)
         app.state.telegram_bot = None
 
     yield
