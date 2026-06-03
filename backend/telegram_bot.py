@@ -114,7 +114,7 @@ Saya akan bantu dengan evidence-based recommendations.
             )
             from google.genai import types
             response = await self.gemini_client.aio.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-2.0-flash",
                 contents=user_message,
                 config=types.GenerateContentConfig(
                     system_instruction=MEDDY_SYSTEM_PROMPT
@@ -126,7 +126,8 @@ Saya akan bantu dengan evidence-based recommendations.
             print(f"[MEDDY] Gemini error: {error_detail}", flush=True)
             logger.error(f"Gemini error for user {user.id}: {error_detail}", exc_info=True)
             await update.message.reply_text(
-                f"[DEBUG] Error: {error_detail}"
+                "Maaf, terjadi kesalahan saat memproses pertanyaan Anda. "
+                "Silakan coba lagi dalam beberapa saat."
             )
 
     async def setup_handlers(self, gemini_api_key: str | None = None):
