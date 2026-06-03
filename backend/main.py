@@ -16,7 +16,6 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
-from telegram import Update
 
 from telegram_bot import get_telegram_bot
 
@@ -37,41 +36,47 @@ APP_VERSION = "0.1.0"
 # LIFESPAN — Start/Stop Telegram Bot
 # ============================================
 
+async def _run_bot(bot):
+    """Jalankan bot menggunakan context manager resmi python-telegram-bot v20."""
+    async with bot.app:
+        await bot.app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+        await bot.app.start()
+        try:
+            await asyncio.Event().wait()  # tunggu sampai di-cancel
+        except asyncio.CancelledError:
+            pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[MEDDY] Server starting up...", flush=True)
 
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     gemini_api_key = os.getenv("GEMINI_API_KEY")
-    bot = None
-    polling_task = None
+    bot_task = None
 
     if bot_token:
-        print(f"[MEDDY] TELEGRAM_BOT_TOKEN ditemukan, memulai bot...", flush=True)
+        print("[MEDDY] TELEGRAM_BOT_TOKEN ditemukan, memulai bot...", flush=True)
         try:
-            bot = get_telegram_bot(bot_token, gemini_api_key)
-            await bot.initialize()
-            await bot.app.start()
-            polling_task = asyncio.create_task(
-                bot.app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-            )
-            app.state.telegram_bot = bot
+            bot = get_telegram_bot(bot_token)
+            await bot.setup_handlers(gemini_api_key)
+            bot_task = asyncio.create_task(_run_bot(bot))
+            await asyncio.sleep(1)  # beri waktu bot untuk connect
             print("[MEDDY] ✓ Telegram bot started", flush=True)
         except Exception as e:
             print(f"[MEDDY] ✗ Failed to start Telegram bot: {e}", flush=True)
             logger.error(f"Failed to start Telegram bot: {e}")
-            app.state.telegram_bot = None
     else:
         print("[MEDDY] ✗ TELEGRAM_BOT_TOKEN tidak ditemukan — bot disabled", flush=True)
-        app.state.telegram_bot = None
 
     yield
 
-    if polling_task:
-        polling_task.cancel()
-    if bot:
+    if bot_task:
+        bot_task.cancel()
         try:
-            await bot.stop()
+            await bot_task
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             logger.error(f"Error stopping Telegram bot: {e}")
 

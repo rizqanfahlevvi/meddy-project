@@ -39,16 +39,15 @@ Format respons:
 class MeddyTelegramBot:
     """MEDDY Telegram Bot Handler"""
 
-    def __init__(self, bot_token: str, gemini_api_key: str | None = None):
+    def __init__(self, bot_token: str):
         self.bot_token = bot_token
-        self.gemini_api_key = gemini_api_key
         self.gemini_model = None
-        self.app = None
+        self.app = Application.builder().token(self.bot_token).build()
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         user = update.effective_user
-        message = f"""
+        message = """
 👋 Selamat datang di MEDDY!
 
 Saya adalah AI Clinical Decision Companion dari MDKIT.
@@ -121,11 +120,8 @@ Saya akan bantu dengan evidence-based recommendations.
                 "Silakan coba lagi dalam beberapa saat."
             )
 
-    async def initialize(self):
-        """Initialize bot application"""
-        self.app = Application.builder().token(self.bot_token).build()
-
-        # Add handlers
+    async def setup_handlers(self, gemini_api_key: str | None = None):
+        """Setup command handlers dan inisialisasi Gemini AI."""
         self.app.add_handler(CommandHandler("start", self.start_command))
         self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CommandHandler("status", self.status_command))
@@ -133,43 +129,21 @@ Saya akan bantu dengan evidence-based recommendations.
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
         )
 
-        await self.app.initialize()
-
-        # Initialize Gemini AI
-        if self.gemini_api_key:
+        if gemini_api_key:
             try:
                 import google.generativeai as genai
-                genai.configure(api_key=self.gemini_api_key)
+                genai.configure(api_key=gemini_api_key)
                 self.gemini_model = genai.GenerativeModel(
                     model_name="gemini-1.5-flash",
                     system_instruction=MEDDY_SYSTEM_PROMPT
                 )
-                logger.info("Gemini AI initialized")
+                print("[MEDDY] ✓ Gemini AI initialized", flush=True)
             except Exception as e:
-                logger.error(f"Failed to initialize Gemini AI: {e}")
+                print(f"[MEDDY] ✗ Gemini init failed: {e}", flush=True)
         else:
-            logger.warning("GEMINI_API_KEY not set — AI responses disabled")
-
-        logger.info("Telegram bot initialized")
-
-    async def start_polling(self):
-        """Start bot with polling (for development)"""
-        if not self.app:
-            await self.initialize()
-
-        await self.app.start()
-        await self.app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-        logger.info("Telegram bot polling started")
-
-    async def stop(self):
-        """Stop bot"""
-        if self.app:
-            await self.app.updater.stop()
-            await self.app.stop()
-            await self.app.shutdown()
-            logger.info("Telegram bot stopped")
+            print("[MEDDY] GEMINI_API_KEY tidak diset — AI disabled", flush=True)
 
 
-def get_telegram_bot(bot_token: str, gemini_api_key: str | None = None) -> MeddyTelegramBot:
+def get_telegram_bot(bot_token: str) -> MeddyTelegramBot:
     """Factory function to create telegram bot instance"""
-    return MeddyTelegramBot(bot_token, gemini_api_key)
+    return MeddyTelegramBot(bot_token)
