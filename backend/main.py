@@ -73,10 +73,9 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown — TIDAK delete webhook agar deployment baru bisa langsung terima pesan
     if bot:
         try:
-            await bot.app.bot.delete_webhook()
             await bot.app.stop()
             await bot.app.shutdown()
             print("[MEDDY] Telegram bot stopped", flush=True)
