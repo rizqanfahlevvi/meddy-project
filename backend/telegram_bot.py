@@ -42,7 +42,8 @@ class MeddyTelegramBot:
     def __init__(self, bot_token: str):
         self.bot_token = bot_token
         self.gemini_model = None
-        self.app = Application.builder().token(self.bot_token).build()
+        # updater(None) = webhook mode, tidak pakai polling/Updater sama sekali
+        self.app = Application.builder().token(self.bot_token).updater(None).build()
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
