@@ -122,10 +122,11 @@ Saya akan bantu dengan evidence-based recommendations.
             )
             await update.message.reply_text(response.text)
         except Exception as e:
-            logger.error(f"Gemini error for user {user.id}: {e}")
+            error_detail = f"{type(e).__name__}: {e}"
+            print(f"[MEDDY] Gemini error: {error_detail}", flush=True)
+            logger.error(f"Gemini error for user {user.id}: {error_detail}", exc_info=True)
             await update.message.reply_text(
-                "Maaf, terjadi kesalahan saat memproses pertanyaan Anda. "
-                "Silakan coba lagi dalam beberapa saat."
+                f"[DEBUG] Error: {error_detail}"
             )
 
     async def setup_handlers(self, gemini_api_key: str | None = None):
