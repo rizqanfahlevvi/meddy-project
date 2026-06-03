@@ -9,7 +9,7 @@ python-telegram-bot==20.5
 python-dotenv==1.0.0
 
 # LLM (Pure Python - No compilation)
-google-generativeai
+google-genai
 
 # Database
 sqlalchemy==2.0.23

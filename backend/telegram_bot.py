@@ -41,7 +41,7 @@ class MeddyTelegramBot:
 
     def __init__(self, bot_token: str):
         self.bot_token = bot_token
-        self.gemini_model = None
+        self.gemini_client = None
         # updater(None) = webhook mode, tidak pakai polling/Updater sama sekali
         self.app = Application.builder().token(self.bot_token).updater(None).build()
 
@@ -85,7 +85,7 @@ Saya akan bantu dengan evidence-based recommendations.
 
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /status command"""
-        ai_status = "✓ Aktif" if self.gemini_model else "✗ Tidak tersedia"
+        ai_status = "✓ Aktif" if self.gemini_client else "✗ Tidak tersedia"
         message = f"✓ MEDDY bot is running normally\n\nAI Engine: {ai_status}\nSiap membantu dokter 24/7"
         await update.message.reply_text(message)
 
@@ -96,7 +96,7 @@ Saya akan bantu dengan evidence-based recommendations.
 
         logger.info(f"Message from {user.first_name} ({user.id}): {user_message}")
 
-        if self.gemini_model is None:
+        if self.gemini_client is None:
             await update.message.reply_text(
                 "Maaf, AI assistant sedang tidak tersedia.\n\n"
                 "Silakan refer ke:\n"
@@ -112,7 +112,14 @@ Saya akan bantu dengan evidence-based recommendations.
                 chat_id=update.effective_chat.id,
                 action="typing"
             )
-            response = await self.gemini_model.generate_content_async(user_message)
+            from google.genai import types
+            response = await self.gemini_client.aio.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=user_message,
+                config=types.GenerateContentConfig(
+                    system_instruction=MEDDY_SYSTEM_PROMPT
+                )
+            )
             await update.message.reply_text(response.text)
         except Exception as e:
             logger.error(f"Gemini error for user {user.id}: {e}")
@@ -132,12 +139,8 @@ Saya akan bantu dengan evidence-based recommendations.
 
         if gemini_api_key:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=gemini_api_key)
-                self.gemini_model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash",
-                    system_instruction=MEDDY_SYSTEM_PROMPT
-                )
+                from google import genai
+                self.gemini_client = genai.Client(api_key=gemini_api_key)
                 print("[MEDDY] ✓ Gemini AI initialized", flush=True)
             except Exception as e:
                 print(f"[MEDDY] ✗ Gemini init failed: {e}", flush=True)
