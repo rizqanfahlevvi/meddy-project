@@ -154,6 +154,28 @@ async def test_webhook():
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/admin/set-webhook")
+async def admin_set_webhook():
+    """Set ulang webhook secara manual (tanpa redeploy)"""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    if not bot_token:
+        return {"error": "TELEGRAM_BOT_TOKEN not set"}
+    if not railway_domain:
+        return {"error": "RAILWAY_PUBLIC_DOMAIN not set"}
+    try:
+        webhook_url = f"https://{railway_domain}/webhook"
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"https://api.telegram.org/bot{bot_token}/setWebhook",
+                json={"url": webhook_url},
+                timeout=10.0
+            )
+        print(f"[MEDDY] Manual set webhook: {webhook_url}", flush=True)
+        return {"webhook_url": webhook_url, "result": r.json()}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/test/telegram")
 async def test_telegram():
     """Test Telegram bot token"""
