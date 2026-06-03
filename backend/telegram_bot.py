@@ -16,13 +16,35 @@ from telegram.ext import (
 
 logger = logging.getLogger(__name__)
 
+MEDDY_SYSTEM_PROMPT = """Kamu adalah MEDDY, AI Clinical Decision Companion dari MDKIT untuk dokter dan tenaga medis profesional di Indonesia.
+
+Peranmu:
+- Memberikan rekomendasi klinis berbasis evidence (evidence-based medicine)
+- Membantu kalkulasi dosis, protokol sepsis, interpretasi lab, persiapan intubasi
+- Menjawab dalam Bahasa Indonesia kecuali istilah medis baku (tetap dalam bahasa Inggris/Latin)
+- Selalu sertakan disclaimer bahwa rekomendasi ini bersifat pendukung keputusan, bukan pengganti penilaian klinis dokter
+
+Batasan:
+- Jangan memberikan diagnosis definitif
+- Jangan merekomendasikan pengobatan untuk pasien tanpa supervision dokter
+- Jika pertanyaan di luar domain medis, tolak dengan sopan dan redirect ke pertanyaan medis
+
+Format respons:
+- Gunakan format terstruktur dengan poin-poin jika relevan
+- Sertakan referensi guideline jika applicable (IDSA, WHO, PNPK, dll)
+- Maksimal 500 kata per respons kecuali diminta lebih detail
+"""
+
+
 class MeddyTelegramBot:
     """MEDDY Telegram Bot Handler"""
-    
-    def __init__(self, bot_token: str):
+
+    def __init__(self, bot_token: str, gemini_api_key: str | None = None):
         self.bot_token = bot_token
+        self.gemini_api_key = gemini_api_key
+        self.gemini_model = None
         self.app = None
-    
+
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         user = update.effective_user
@@ -42,7 +64,7 @@ Ketik /help untuk lebih lanjut.
         """
         await update.message.reply_text(message)
         logger.info(f"User started bot: {user.first_name} ({user.id})")
-    
+
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
         message = """
@@ -60,37 +82,49 @@ Atau langsung kirim pertanyaan medis:
 Saya akan bantu dengan evidence-based recommendations.
         """
         await update.message.reply_text(message)
-    
+
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /status command"""
-        message = "✓ MEDDY bot is running normally\n\nSiap membantu dokter 24/7"
+        ai_status = "✓ Aktif" if self.gemini_model else "✗ Tidak tersedia"
+        message = f"✓ MEDDY bot is running normally\n\nAI Engine: {ai_status}\nSiap membantu dokter 24/7"
         await update.message.reply_text(message)
-    
+
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle incoming text messages"""
         user_message = update.message.text
         user = update.effective_user
-        
-        logger.info(f"Message from {user.first_name} ({user.id}): {user_message}")
-        
-        # For MVP, simple echo response
-        # Later: integrate with Gemini AI
-        response = f"""Saya terima pertanyaan Anda:
-"{user_message}"
 
-Full AI integration coming soon! 
-Untuk saat ini, silakan refer ke:
-- ICU Helper: https://icuhelper.mdkit.app/
-- ACLS Helper: https://aclshelper.mdkit.app/
-- ResNeo Helper: https://resneohelper.mdkit.app/
-- PICNIC Helper: https://picnichelper.mdkit.app/
-        """
-        await update.message.reply_text(response)
-    
+        logger.info(f"Message from {user.first_name} ({user.id}): {user_message}")
+
+        if self.gemini_model is None:
+            await update.message.reply_text(
+                "Maaf, AI assistant sedang tidak tersedia.\n\n"
+                "Silakan refer ke:\n"
+                "- ICU Helper: https://icuhelper.mdkit.app/\n"
+                "- ACLS Helper: https://aclshelper.mdkit.app/\n"
+                "- ResNeo Helper: https://resneohelper.mdkit.app/\n"
+                "- PICNIC Helper: https://picnichelper.mdkit.app/"
+            )
+            return
+
+        try:
+            await context.bot.send_chat_action(
+                chat_id=update.effective_chat.id,
+                action="typing"
+            )
+            response = await self.gemini_model.generate_content_async(user_message)
+            await update.message.reply_text(response.text)
+        except Exception as e:
+            logger.error(f"Gemini error for user {user.id}: {e}")
+            await update.message.reply_text(
+                "Maaf, terjadi kesalahan saat memproses pertanyaan Anda. "
+                "Silakan coba lagi dalam beberapa saat."
+            )
+
     async def initialize(self):
         """Initialize bot application"""
         self.app = Application.builder().token(self.bot_token).build()
-        
+
         # Add handlers
         self.app.add_handler(CommandHandler("start", self.start_command))
         self.app.add_handler(CommandHandler("help", self.help_command))
@@ -98,19 +132,35 @@ Untuk saat ini, silakan refer ke:
         self.app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
         )
-        
+
         await self.app.initialize()
+
+        # Initialize Gemini AI
+        if self.gemini_api_key:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=self.gemini_api_key)
+                self.gemini_model = genai.GenerativeModel(
+                    model_name="gemini-1.5-flash",
+                    system_instruction=MEDDY_SYSTEM_PROMPT
+                )
+                logger.info("Gemini AI initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini AI: {e}")
+        else:
+            logger.warning("GEMINI_API_KEY not set — AI responses disabled")
+
         logger.info("Telegram bot initialized")
-    
+
     async def start_polling(self):
         """Start bot with polling (for development)"""
         if not self.app:
             await self.initialize()
-        
+
         await self.app.start()
         await self.app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
         logger.info("Telegram bot polling started")
-    
+
     async def stop(self):
         """Stop bot"""
         if self.app:
@@ -119,6 +169,7 @@ Untuk saat ini, silakan refer ke:
             await self.app.shutdown()
             logger.info("Telegram bot stopped")
 
-def get_telegram_bot(bot_token: str) -> MeddyTelegramBot:
+
+def get_telegram_bot(bot_token: str, gemini_api_key: str | None = None) -> MeddyTelegramBot:
     """Factory function to create telegram bot instance"""
-    return MeddyTelegramBot(bot_token)
+    return MeddyTelegramBot(bot_token, gemini_api_key)
